@@ -1,0 +1,14 @@
+2023-03-11 17:54:41.603603314000 [297631(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-11 17:55:05.383513846000 [297859(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-11 18:01:56.011867457000 [304554(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-11 18:07:23.890787961000 [307349(ThreadId 16)] CRITICAL REQUEST - invalid HANDLE. eof.
+2023-03-11 18:07:27.666401891000 [307472(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-11 18:07:30.538635606000 [307538(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-11 18:07:36.653245716000 [307626(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-11 18:07:51.998916556000 [308021(ThreadId 17)] ERROR APP - start debugging failed. user error (ExecResult not found.) : Left "user error (ExecResult not found.)"
+2023-03-11 18:08:35.442654787000 [308572(ThreadId 17)] ERROR APP - start debugging failed. user error (ExecResult not found.) : Left "user error (ExecResult not found.)"
+2023-03-11 18:09:06.544820464000 [308860(ThreadId 17)] ERROR APP - user error (<getModule> loaded module can not find from path. </home/mylan/Documents/FLP/projekt/app/Main.hs> [])
+2023-03-11 18:09:06.558650864000 [308860(ThreadId 17)] ERROR APP - start debugging failed. user error (ExecResult not found.) : Left "user error (ExecResult not found.)"
+2023-03-15 19:26:02.349458427000 [18120(ThreadId 16)] CRITICAL REQUEST - invalid HANDLE. eof.
+2023-03-25 14:27:18.804459700000 [941926(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.
+2023-03-25 14:27:21.974920671000 [942038(ThreadId 17)] ERROR APP - [CRITICAL] can not get the initial ghci prompt.

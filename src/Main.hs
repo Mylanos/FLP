@@ -3,29 +3,50 @@
 
 import System.Environment ( getArgs )
 import System.IO
+import System.Random
 import Control.Exception ( evaluate)
 import Text.ParserCombinators.Parsec
 import qualified Text.Parsec as Parsec
 import Text.Parsec ((<?>))
 import Text.Parsec.String
 import Numeric
+--import Control.Monad.Random
 
+-- TODO mozno by bolo dobre vracat either aj pre argumenty namiesto tych errorov a potom switchovat na zaklade left right
 data Mode = I_OPTION | K_OPTION | S_OPTION | V_OPTION | H_OPTION deriving (Show)
 
 data Params = Params { mode :: Mode, file :: String } deriving (Show)
 
-data Point =  Point { x:: Integer, y::Integer } deriving (Show)
+data Point =  Point { x:: Integer, y::Integer } | INF_POINT deriving (Eq, Show)
 
 data Curve = Curve {p:: Integer, a::Integer, b::Integer, g::Point, n::Integer, h::Integer} deriving (Show)
+
+data KeyPair = KeyPair { private:: Point, public:: Point} deriving (Show)
 
 main :: IO()
 main = do
     args <- getArgs                  -- IO [String]
     let params = argsParse args
     fileContent <- myReadFile params
-    let curve = inputParse fileContent
+    --let numberGenerator = randomNum
+    -- get a random number generator:
+    let mySeed = 54321
+    let rng1 = mkStdGen mySeed  
+
+    let point1 = Point 0 1
+    print $ pointAdd point1 $ pointNegation(point1)
+
+
+    case inputParse fileContent of
+      Left err -> putStrLn $ "Parsing error: " ++ show err
+      Right curve ->
+        case params of
+          (Params I_OPTION _) -> print curve
+          (Params K_OPTION _) -> print keypair
+            where (keypair, _) = generateKeyPair curve rng1
+            
     -- let result = execute params
-    print curve
+    --print curve
 
 myReadFile :: Params -> IO String
 myReadFile (Params _ file)
@@ -91,12 +112,28 @@ curve = do
 inputParse :: String -> Either ParseError Curve
 inputParse input = parse curve "" input
 
--- parseNull :: Parser JSON 
--- parseNull = Null <$ string "null"
 
--- inputParse:: String -> Curve
+pointNegation :: Point -> Point
+pointNegation (Point x y) = (Point x negY)
+  where negY = negate(y)
+
+pointAdd :: Point -> Point -> Point
+pointAdd p1@(Point x1 y1) INF_POINT = p1
+pointAdd INF_POINT p2@(Point x1 y1) = p2
+pointAdd p1@(Point x1 y1) p2@(Point x2 y2) 
+  | p1 == pointNegation(p2) = INF_POINT
 
 
--- inputParse:: [] -> error "Zly format"
--- execute :: Params -> String
--- execute (Params I_OPTION x) = "hehe"
+randomizeInt :: RandomGen tg => Integer -> tg -> (Integer, tg)
+randomizeInt 0 rng = (0, rng)
+randomizeInt n rng = randomNum 1 n rng
+
+randomNum:: RandomGen tg => Integer -> Integer -> tg -> (Integer, tg)
+randomNum from to rng = randomR(from, to) rng
+
+generateKeyPair :: RandomGen tg => Curve -> tg -> (Integer, tg)
+--generateKeyPair (Curve p a b g n h) rng = KeyPair (Point $ randomNum n $ randomNum n) (Point $ randomNum n $ randomNum n)
+generateKeyPair (Curve p a b g n h) rng = 
+  let (secretKey, rng2) = randomizeInt n rng
+  in (secretKey,rng2)
+

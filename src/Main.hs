@@ -14,7 +14,7 @@ data Point =  Point { x:: Integer, y::Integer } | INF_POINT deriving (Eq, Show)
 
 data Curve = Curve {p:: Integer, a::Integer, b::Integer, g::Point, n::Integer, h::Integer} deriving (Show)
 
-data KeyPair = KeyPair { private:: Point, public:: Point} deriving (Show)
+data KeyPair = KeyPair { private:: Integer, public:: Point} deriving (Show)
 
 main :: IO()
 main = do
@@ -23,14 +23,15 @@ main = do
     fileContent <- myReadFile params
     --let numberGenerator = randomNum
     -- get a random number generator:
-    let mySeed = 54321
+    let mySeed = 7654321
     let rng1 = mkStdGen mySeed  
 
     let point1 = Point 6 1
     let point2 = Point 8 1
+    let point3 = Point 13 16
 
-    -- print $ pointAdd point1 $ pointNegation(point1)
-    --print $ pointAdd point1 point2
+    -- print $ pointDoubleOrAdd point1 $ pointNegation(point1)
+    --print $ pointDoubleOrAdd point1 point2
 
     case inputParse fileContent of
       Left err -> putStrLn $ "Parsing error: " ++ show err
@@ -38,8 +39,9 @@ main = do
         case params of
           (Params I_OPTION _) -> print curve
           --(Params K_OPTION _) -> print keypair
-          --(Params K_OPTION _) -> print $ pointAdd curve point1 point2
-          (Params K_OPTION _) -> print $ pointAdd (Curve 37 0 7 (Point 6 1) 0 0) point1 point2
+          --(Params K_OPTION _) -> print $ pointDoubleOrAdd curve point1 point2
+          --(Params K_OPTION _) -> print $ pointDoubleOrAdd (Curve 37 0 7 (Point 6 1) 7 1) point1 point1
+          (Params K_OPTION _) -> print $ keypair
             where (keypair, _) = generateKeyPair curve rng1
           (Params S_OPTION _) -> print curve
           (Params V_OPTION _) -> print curve
@@ -112,23 +114,22 @@ inputParse input = parse curveParse "" input
 -- [0, 0] + [2, 3] -> OK [2,3]
 -- [2, 3] + [0, 0] -> OK [2,3]
 -- [2, 3] + [1, 0] -> OK [2,3]
-pointAdd :: Curve -> Point -> Point -> Point
-pointAdd _ INF_POINT p2 = p2
-pointAdd _ p1 INF_POINT = p1
-pointAdd (Curve p a b _ n _) p1@(Point x1 y1) p2@(Point x2 y2)
+pointDoubleOrAdd :: Curve -> Point -> Point -> Point
+pointDoubleOrAdd _ INF_POINT p2 = p2
+pointDoubleOrAdd _ p1 INF_POINT = p1
+pointDoubleOrAdd (Curve p a b _ n _) p1@(Point x1 y1) p2@(Point x2 y2)
   | (x1 == x2) && (y1 == negate y2) = INF_POINT
   | otherwise = 
   let 
-      lambda = pointDouble a p p1 p2
+      lambda = calcLambda a p p1 p2
       xNew = ((lambda * lambda) - (x1 + x2)) `mod` p
       yNew = ((lambda * (x1 - xNew)) - y1) `mod` p
   in Point xNew yNew
 
-
-pointDouble :: Integer -> Integer -> Point -> Point -> Integer
-pointDouble _ _ INF_POINT _ = 0
-pointDouble _ _ _ INF_POINT = 0
-pointDouble a p (Point x1 y1) (Point x2 y2)
+calcLambda :: Integer -> Integer -> Point -> Point -> Integer
+calcLambda _ _ INF_POINT _ = 0
+calcLambda _ _ _ INF_POINT = 0
+calcLambda a p (Point x1 y1) (Point x2 y2)
   | (x1 == x2) && (y1 == y2) = 
     let 
       res1 = ((3 * ( x2*x2 )) + a) `div` (2 * y2)
@@ -140,6 +141,15 @@ pointDouble a p (Point x1 y1) (Point x2 y2)
       res2 = yDiff `div` xDiff
     in res2 `mod` p
 
+pointMultiply :: Curve -> Integer -> Point -> Point
+pointMultiply _ 0 _ = INF_POINT
+pointMultiply _ 1 p = p 
+pointMultiply c n p@(Point _ _) 
+-- addition - firstly call recursively pointMultiply and then add the result to current point
+  | n `mod` 2 == 1 = pointDoubleOrAdd c p $ pointMultiply c (n-1) p
+-- doubling - firstly double the current point and then recursively call pointMultiply
+  | otherwise = pointMultiply c  (n `div` 2) $ pointDoubleOrAdd c p p
+
 randomizeInt :: RandomGen tg => Integer -> tg -> (Integer, tg)
 randomizeInt 0 rng = (0, rng)
 randomizeInt n rng = randomNum 1 n rng
@@ -147,9 +157,10 @@ randomizeInt n rng = randomNum 1 n rng
 randomNum:: RandomGen tg => Integer -> Integer -> tg -> (Integer, tg)
 randomNum from to rng = randomR(from, to) rng
 
-generateKeyPair :: RandomGen tg => Curve -> tg -> (Integer, tg)
+generateKeyPair :: RandomGen tg => Curve -> tg -> (KeyPair, tg)
 --generateKeyPair (Curve p a b g n h) rng = KeyPair (Point $ randomNum n $ randomNum n) (Point $ randomNum n $ randomNum n)
-generateKeyPair (Curve _ _ _ _ n _) rng = 
+generateKeyPair c@(Curve _ _ _ k n _) rng = 
   let (secretKey, rng2) = randomizeInt n rng
-  in (secretKey, rng2)
+  -- in (secretKey, rng2) = 
+  in (KeyPair 91305095057638279798210088207290086814184648949849354342409048655369161716366 $ pointMultiply c 91305095057638279798210088207290086814184648949849354342409048655369161716366 k, rng2)
 

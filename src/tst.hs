@@ -1,15 +1,16 @@
 --lenn :: a -> b
 --ll :: n -> [a] -> 
-lenn :: [a] -> Int
+heh :: Integer -> Integer
+heh x 
+    | x == 1 = 69
+    | otherwise = kek
+        where
+            | x == 2 = 42
+            | otherwise = 100
 
-lenn [] = 0
-lenn (_:xs) = 
-    let ll n [] = n
-        ll n (_:xs) = ll (n+1) xs
-    in ll 1 xs
 
 main :: IO ()
 main =  do 
     putStrLn "Length of list: "
-    print(lenn [1..20])
+    print(heh(2))
 

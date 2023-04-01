@@ -1,16 +1,9 @@
--- from "Learn You a Haskell"
--- http://learnyouahaskell.com/input-and-output
-
 import System.Environment ( getArgs )
 import System.IO
 import System.Random
 import Control.Exception ( evaluate)
 import Text.ParserCombinators.Parsec
-import qualified Text.Parsec as Parsec
-import Text.Parsec ((<?>))
-import Text.Parsec.String
 import Numeric
---import Control.Monad.Random
 
 -- TODO mozno by bolo dobre vracat either aj pre argumenty namiesto tych errorov a potom switchovat na zaklade left right
 data Mode = I_OPTION | K_OPTION | S_OPTION | V_OPTION | H_OPTION deriving (Show)
@@ -33,17 +26,24 @@ main = do
     let mySeed = 54321
     let rng1 = mkStdGen mySeed  
 
-    let point1 = Point 0 1
-    print $ pointAdd point1 $ pointNegation(point1)
+    let point1 = Point 6 1
+    let point2 = Point 8 1
 
+    -- print $ pointAdd point1 $ pointNegation(point1)
+    --print $ pointAdd point1 point2
 
     case inputParse fileContent of
       Left err -> putStrLn $ "Parsing error: " ++ show err
       Right curve ->
         case params of
           (Params I_OPTION _) -> print curve
-          (Params K_OPTION _) -> print keypair
+          --(Params K_OPTION _) -> print keypair
+          --(Params K_OPTION _) -> print $ pointAdd curve point1 point2
+          (Params K_OPTION _) -> print $ pointAdd (Curve 37 0 7 (Point 6 1) 0 0) point1 point2
             where (keypair, _) = generateKeyPair curve rng1
+          (Params S_OPTION _) -> print curve
+          (Params V_OPTION _) -> print curve
+          (Params H_OPTION _) -> print curve
             
     -- let result = execute params
     --print curve
@@ -83,46 +83,62 @@ hexInteger = do
   return $ fst $ head $ readHex $ digits
 
 -- Parse a point
-point :: Parser Point
-point = do
-  string "Point" *> spaces *> char '{' *> spaces
+pointParse :: Parser Point
+pointParse = do
+  _ <- string "Point" *> spaces *> char '{' *> spaces
   xVal <- string "x:" *> spaces *> hexInteger <* spaces
   yVal <- string "y:" *> spaces *> hexInteger <* spaces
-  string "}" 
+  _ <- string "}" 
   spaces
   return $ Point xVal yVal
 
-eol :: Parser Char
-eol = char '\n'
-
 -- Parse a curve
-curve :: Parser Curve
-curve = do
-  string "Curve" *> spaces *> char '{' *> spaces
+curveParse :: Parser Curve
+curveParse = do
+  _ <- string "Curve" *> spaces *> char '{' *> spaces
   pVal <- string "p:" *> spaces *> hexInteger <* spaces
   aVal <- string "a:" *> spaces *> hexInteger <* spaces
   bVal <- string "b:" *> spaces *> hexInteger <* spaces
-  gVal <- string "g:" *> spaces *> point
+  gVal <- string "g:" *> spaces *> pointParse
   nVal <- string "n:" *> spaces *> hexInteger <* spaces
   hVal <- string "h:" *> spaces *> hexInteger <* spaces
-  string "}"
+  _ <- string "}"
   return $ Curve pVal aVal bVal gVal nVal hVal
 
--- Test function
+-- parsing
 inputParse :: String -> Either ParseError Curve
-inputParse input = parse curve "" input
+inputParse input = parse curveParse "" input
+
+-- [0, 0] + [2, 3] -> OK [2,3]
+-- [2, 3] + [0, 0] -> OK [2,3]
+-- [2, 3] + [1, 0] -> OK [2,3]
+pointAdd :: Curve -> Point -> Point -> Point
+pointAdd _ INF_POINT p2 = p2
+pointAdd _ p1 INF_POINT = p1
+pointAdd (Curve p a b _ n _) p1@(Point x1 y1) p2@(Point x2 y2)
+  | (x1 == x2) && (y1 == negate y2) = INF_POINT
+  | otherwise = 
+  let 
+      lambda = pointDouble a p p1 p2
+      xNew = ((lambda * lambda) - (x1 + x2)) `mod` p
+      yNew = ((lambda * (x1 - xNew)) - y1) `mod` p
+  in Point xNew yNew
 
 
-pointNegation :: Point -> Point
-pointNegation (Point x y) = (Point x negY)
-  where negY = negate(y)
-
-pointAdd :: Point -> Point -> Point
-pointAdd p1@(Point x1 y1) INF_POINT = p1
-pointAdd INF_POINT p2@(Point x1 y1) = p2
-pointAdd p1@(Point x1 y1) p2@(Point x2 y2) 
-  | p1 == pointNegation(p2) = INF_POINT
-
+pointDouble :: Integer -> Integer -> Point -> Point -> Integer
+pointDouble _ _ INF_POINT _ = 0
+pointDouble _ _ _ INF_POINT = 0
+pointDouble a p (Point x1 y1) (Point x2 y2)
+  | (x1 == x2) && (y1 == y2) = 
+    let 
+      res1 = ((3 * ( x2*x2 )) + a) `div` (2 * y2)
+    in res1 `mod` p
+  | otherwise =
+    let 
+      yDiff = y2 - y1
+      xDiff = x2 - x1
+      res2 = yDiff `div` xDiff
+    in res2 `mod` p
 
 randomizeInt :: RandomGen tg => Integer -> tg -> (Integer, tg)
 randomizeInt 0 rng = (0, rng)
@@ -133,7 +149,7 @@ randomNum from to rng = randomR(from, to) rng
 
 generateKeyPair :: RandomGen tg => Curve -> tg -> (Integer, tg)
 --generateKeyPair (Curve p a b g n h) rng = KeyPair (Point $ randomNum n $ randomNum n) (Point $ randomNum n $ randomNum n)
-generateKeyPair (Curve p a b g n h) rng = 
+generateKeyPair (Curve _ _ _ _ n _) rng = 
   let (secretKey, rng2) = randomizeInt n rng
-  in (secretKey,rng2)
+  in (secretKey, rng2)
 

@@ -1,0 +1,20 @@
+Vstupne subory:
+    test/test1.in -> vstup je jednoducha elipticka krivka, pouzivana na rucne dopocitanie spravnosti algoritmu
+                  -> moznost spustenia nad -i -k volbami
+                  Priklad spustenia:
+                    $ ./flp22-fun -k test/test1.in  -> ocakavany vystup v test1_i.out
+                    $ ./flp22-fun -i test/test1.in  -> ocakavany vystup v test1_k.out
+    test/test2.in -> vstup s eliptickou krivka zo zadania
+                  -> moznost spustenia nad -i -k volbami
+                  Priklad spustenia:
+                    $ ./flp22-fun -k test/test2.in  -> ocakavany vystup v test2_i.out
+                    $ ./flp22-fun -i test/test2.in  -> ocakavany vystup v test2_k.out
+    test/test3.in -> vstupom je elipticka krivka a hash zo zadania, a ako kluc je pouzity kluc vygenerovany zo vstupu test/test2.in
+                  -> moznost spustenia nad -s volbou
+                  Priklad spustenia:
+                    $ ./flp22-fun -s test/test3.in  -> ocakavany vystup v test3.out
+    test/test4.in -> vstupom je elipticka krivka a hash zo zadania, kluc vygenerovany zo vstupu test/test2.in a podpis vygenerovany z test/test3.in
+                  -> moznost spustenia nad -v volbou
+                  Priklad spustenia:
+                    $ ./flp22-fun -v test/test4.in  -> ocakavany vystup v test4.out
+                  

@@ -4,24 +4,33 @@ import System.Random
 import Control.Exception ( evaluate)
 import Text.ParserCombinators.Parsec
 import Numeric
+import Data.Char (intToDigit)
 
--- TODO mozno by bolo dobre vracat either aj pre argumenty namiesto tych errorov a potom switchovat na zaklade left right
-data Mode = I_OPTION | K_OPTION | S_OPTION | V_OPTION | H_OPTION deriving (Show)
+data Mode = I_OPTION | K_OPTION | S_OPTION | V_OPTION deriving (Show)
 
-data Params = Params { mode :: Mode, file :: String } deriving (Show)
+data Params = Params Mode String deriving (Show)
 
-data Point =  Point { x:: Integer, y::Integer } | INF_POINT deriving (Eq, Show)
+data Point =  Point Integer Integer | INF_POINT deriving (Eq)
 
-data Curve = Curve {p:: Integer, a::Integer, b::Integer, g::Point, n::Integer, h::Integer} deriving (Show)
+instance Show Point where
+  show (Point x y) = decToHex x ++ decToHex y ++ "\n"
+  show INF_POINT = "INFINITY POINT\n"
 
-data KeyPair = KeyPair { private:: Integer, public:: Point} deriving (Show)
+data Curve = Curve Integer Integer Integer Point Integer Integer deriving (Show)
 
-data Signature = Signature { r:: Integer, s:: Integer} deriving (Show)
+data KeyPair = KeyPair Integer Point
 
+instance Show KeyPair where
+  show (KeyPair priv pub) = "Key {\nd: 0x" ++ decToHex priv ++ "\nQ: 0x04" ++ show pub ++ "}"
 
+data Signature = Signature Integer Integer
+
+instance Show Signature where
+  show (Signature r s) = "Signature {\nr: 0x" ++ decToHex r ++ "\ns: 0x" ++ decToHex s ++ "\n}"
+ 
 main :: IO()
 main = do
-    args <- getArgs                  -- IO [String]
+    args <- getArgs
     let params = argsParse args
     fileContent <- myReadFile params
     --let numberGenerator = randomNum
@@ -29,38 +38,33 @@ main = do
     let mySeed = 7654321
     let rng1 = mkStdGen mySeed  
 
-    let point1 = Point 6 1
-    let point2 = Point 8 1
-    let point3 = Point 13 16
-    let hash = 67213401616213387970971763789012420154960832235626142256921887584606087023075
-    let publicKey = Point 46708116978045949128126606656587981811337507042416885728414175564892275890406 5702285058721776178091486875671758702564598994857583307601405313313922439896
-    -- print $ pointDoubleOrAdd point1 $ pointNegation(point1)
-    --print $ pointDoubleOrAdd point1 point2
-
-    case inputParse fileContent of
-      Left err -> putStrLn $ "Parsing error: " ++ show err
-      Right curve ->
-        case params of
-          (Params I_OPTION _) -> print curve
-          --(Params K_OPTION _) -> print $ extendedEuclidean 240 46
-          --(Params K_OPTION _) -> print $ pointDoubleOrAdd curve point1 point2
-          --(Params K_OPTION _) -> print $ pointDoubleOrAdd (Curve 37 0 7 (Point 6 1) 7 1) point1 point1
-          (Params K_OPTION _) -> print $ keypair
+    case params of
+      (Params I_OPTION _) -> 
+        case curveParseHandler fileContent of
+          Left err -> putStrLn $ "Parsing error: " ++ show err
+          Right curve -> print curve
+      (Params K_OPTION _) -> 
+        case curveParseHandler fileContent of 
+          Left err -> putStrLn $ "Parsing error: " ++ show err
+          Right curve -> print $ keypair 
             where 
               (keypair, _) = generateKeyPair curve rng1
-          (Params S_OPTION _) -> print $ signature 
+      (Params S_OPTION _) -> 
+        case signatureCreationParseHandler fileContent of
+          Left err -> putStrLn $ "Parsing error: " ++ show err
+          Right (curve, keypair, hash) -> print $ signature 
             where 
-              (keypair, rng2) = generateKeyPair curve rng1
-              (signature, _) = createSignature curve keypair hash rng2
-          (Params V_OPTION _) -> print $ result
+              (signature, _) = createSignature curve keypair hash rng1
+      (Params V_OPTION _) -> 
+        case signatureVerificationParseHandler fileContent of
+          Left err -> putStrLn $ "Parsing error: " ++ show err
+          Right (curve, signature, pub, hash) -> print $ result
             where 
-              (keypair, rng2) = generateKeyPair curve rng1
-              (signature, _) = createSignature curve keypair hash rng2
-              result = signatureVerification curve keypair signature hash
-          --(Params H_OPTION _) -> print curve
-            
-    -- let result = execute params
-    --print curve
+              result = signatureVerification curve pub signature hash
+      --(Params H_OPTION _) -> print curve
+
+decToHex :: Integer -> String
+decToHex n = showIntAtBase 16 intToDigit n ""           
 
 myReadFile :: Params -> IO String
 myReadFile (Params _ file)
@@ -93,7 +97,6 @@ argsParse (x:y:[])
 hexInteger :: Parser Integer
 hexInteger = do
   digits <- try (string "0x" >> many1 hexDigit) <|> many1 digit
-  --digits <- many1 hexDigit
   return $ fst $ head $ readHex $ digits
 
 -- Parse a point
@@ -123,12 +126,89 @@ curveParse = do
   _ <- spaces
   hVal <- string "h:" >> spaces >> hexInteger
   _ <- spaces
-  _ <- string "}"
+  _ <- string "}" 
+  _ <- spaces
   return $ Curve pVal aVal bVal gVal nVal hVal
 
+splitHex :: String -> (Integer, Integer)
+splitHex hex =
+  let halfLen = length hex `div` 2
+      (left, right) = splitAt halfLen hex
+      leftInt = read ("0x" ++ left)
+      rightInt = read ("0x" ++ right)
+  in (leftInt, rightInt)
+
+secFormatParse :: Parser (Integer, Integer)
+secFormatParse = do
+  digits <- try (string "0x04" >> many1 hexDigit) <|> many1 digit
+  let (x, y) = splitHex digits
+  -- return $ fst $ head $ readHex $ digits
+  return (x, y)
+
+-- Parse a point
+keyParse :: Parser KeyPair
+keyParse = do
+  _ <- string "Key" >> spaces >> char '{' >> spaces
+  dVal <- string "d:" >> spaces >> hexInteger 
+  _ <- spaces
+  (x, y) <- string "Q:" >> spaces >> secFormatParse
+  _ <- spaces
+  _ <- string "}" 
+  _ <- spaces
+  return $ KeyPair dVal (Point x y)
+
+-- Parse a point
+signatureParse :: Parser Signature
+signatureParse = do
+  _ <- string "Signature" >> spaces >> char '{' >> spaces
+  rVal <- string "r:" >> spaces >> hexInteger 
+  _ <- spaces
+  sVal <- string "s:" >> spaces >> hexInteger
+  _ <- spaces
+  _ <- string "}" 
+  _ <- spaces
+  return $ Signature rVal sVal
+
+-- Parse a point
+publicKeyParse :: Parser Point
+publicKeyParse = do
+  _ <- string "PublicKey" >> spaces >> char '{' >> spaces
+  (x, y) <- string "Q:" >> spaces >> secFormatParse
+  _ <- spaces
+  _ <- string "}" 
+  _ <- spaces
+  return $ Point x y
+
+hashParse :: Parser Integer
+hashParse = do 
+  _ <- spaces
+  hashVal <- string "Hash:" >> spaces >> hexInteger 
+  _ <- spaces
+  _ <- spaces
+  return hashVal
+
 -- parsing
-inputParse :: String -> Either ParseError Curve
-inputParse input = parse curveParse "" input
+curveParseHandler :: String -> Either ParseError Curve
+curveParseHandler input = parse curveParse "" input
+
+signatureCreationParseHandler :: String -> Either ParseError (Curve, KeyPair, Integer)
+signatureCreationParseHandler input = parse combinedParser "" input
+  where 
+    combinedParser = do
+      curve <- curveParse
+      keyPair <- keyParse
+      hash <- hashParse
+      return (curve, keyPair, hash)
+
+signatureVerificationParseHandler :: String -> Either ParseError (Curve, Signature, Point, Integer)
+signatureVerificationParseHandler input = parse combinedParser "" input
+  where 
+    combinedParser = do
+      curve <- curveParse
+      signature <- signatureParse
+      publicKey <- publicKeyParse
+      hash <- hashParse
+      return (curve, signature, publicKey, hash)
 
 -- [0, 0] + [2, 3] -> OK [2,3]
 -- [2, 3] + [0, 0] -> OK [2,3]
@@ -138,7 +218,7 @@ pointDoubleOrAdd _ INF_POINT p2 = p2
 pointDoubleOrAdd _ p1 INF_POINT = p1
 pointDoubleOrAdd _ (Point 0 0) p2 = p2
 pointDoubleOrAdd _ p1 (Point 0 0) = p1
-pointDoubleOrAdd (Curve p a b _ n _) p1@(Point x1 y1) p2@(Point x2 y2)
+pointDoubleOrAdd (Curve p a _ _ _ _) p1@(Point x1 y1) p2@(Point x2 y2)
   | (x1 == x2) && (y1 == negate y2) = INF_POINT
   | otherwise = 
   let 
@@ -169,15 +249,16 @@ calcLambda a p (Point x1 y1) (Point x2 y2)
 pointMultiply :: Curve -> Integer -> Point -> Point
 pointMultiply _ 0 _ = INF_POINT
 pointMultiply _ 1 p = p 
+pointMultiply _ _ INF_POINT = INF_POINT 
 pointMultiply c n p@(Point _ _) 
 -- addition - firstly call recursively pointMultiply and then add the result to current point
   | n `mod` 2 == 1 = pointDoubleOrAdd c p $ pointMultiply c (n-1) p
 -- doubling - firstly double the current point and then recursively call pointMultiply
-  | otherwise = pointMultiply c  (n `div` 2) $ pointDoubleOrAdd c p p
+  | otherwise = pointMultiply c (n `div` 2) $ pointDoubleOrAdd c p p
 
 modInv :: Integer -> Integer -> Integer
 modInv a m = 
-  let (r, t, s) = extendedEuclidean a m
+  let (r, t, _) = extendedEuclidean a m
   in if r /= 1
     then error "There was an error calculating modular inverse"
     else t `mod` m
@@ -198,20 +279,21 @@ randomNum:: RandomGen tg => Integer -> Integer -> tg -> (Integer, tg)
 randomNum from to rng = randomR(from, to) rng
 
 generateKeyPair :: RandomGen tg => Curve -> tg -> (KeyPair, tg)
---generateKeyPair (Curve p a b g n h) rng = KeyPair (Point $ randomNum n $ randomNum n) (Point $ randomNum n $ randomNum n)
 generateKeyPair c@(Curve _ _ _ k n _) rng = 
   let 
     (secretKey, rng2) = randomizeInt n rng
-  -- in (secretKey, rng2) = 
-  -- in (KeyPair 91305095057638279798210088207290086814184648949849354342409048655369161716366 $ pointMultiply c 91305095057638279798210088207290086814184648949849354342409048655369161716366 k, rng2)
   in (KeyPair secretKey $ pointMultiply c secretKey k, rng2)
 
 createSignature :: RandomGen tg => Curve -> KeyPair -> Integer -> tg -> (Signature, tg)
-createSignature c@(Curve _ _ _ (Point x y) n _) kp@(KeyPair priv pub) hash rng =
+createSignature (Curve _ _ _ INF_POINT _ _) _ _ rng = (Signature 0 0, rng)
+createSignature _ (KeyPair _ INF_POINT) _ rng = (Signature 0 0, rng)
+createSignature c@(Curve _ _ _ g n _) kp@(KeyPair priv _) hash rng =
   let
     (k, rng2) = randomizeInt n rng
-    (Point xkG ykG) = pointMultiply c k (Point x y)
-    r = x `mod` n
+    pointsAdded = pointMultiply c k g
+    r = case pointsAdded of
+      INF_POINT -> 0
+      (Point xkG _ ) -> xkG `mod` n
   in 
     if r == 0 
       then 
@@ -221,24 +303,45 @@ createSignature c@(Curve _ _ _ (Point x y) n _) kp@(KeyPair priv pub) hash rng =
         (Signature r ((hash + r * priv) * (modInv k n) `mod` n), rng2)
 
 isOnCurve :: Curve -> Point -> Bool
-isOnCurve c@(Curve p a b _ _ _) (Point x y) =
+isOnCurve _ INF_POINT = False
+isOnCurve (Curve p a b _ _ _) (Point x y) =
   let
       left = (y * y) `mod` p
       right = ((x * x * x) + (a * x) + b) `mod` p
   in left == right
 
-signatureVerification :: Curve -> KeyPair -> Signature -> hash -> Bool
-signatureVerification _ kp@(KeyPair priv INF_POINT) _ _ = False
-signatureVerification c@(Curve _ _ _ (Point x y) n _) kp@(KeyPair priv pub) sig@(Signature r s) hash =
+isInRange :: Integer -> Integer -> Bool
+isInRange upBound n = (1 <= n) && (n <= upBound - 1)
+
+isSignatureInRange :: Signature -> Integer -> Bool
+isSignatureInRange (Signature r s) n = 
+  let 
+    rCheck = isInRange n r
+    sCheck = isInRange n s
+  in rCheck && sCheck
+
+signatureVerification :: Curve -> Point -> Signature -> Integer -> Bool
+signatureVerification (Curve _ _ _ INF_POINT _ _) _ _ _ = False
+signatureVerification _ INF_POINT _ _ = False
+signatureVerification c@(Curve p _ _ g n _) publicKey sig@(Signature r s) hash =
   let
-    onCurve = isOnCurve c pub
+    onCurve = isOnCurve c publicKey
     result = if onCurve == True 
       then 
         let
-          kek = True
-        in kek
+          check1 = isSignatureInRange sig n
+          w = (modInv s n) `mod` n
+          u1 = (hash * w) `mod` n
+          u2 = (r * w) `mod` n
+          u1G = pointMultiply c u1 g 
+          u2Q = pointMultiply c u2 publicKey 
+          pointsAdded = pointDoubleOrAdd c u1G u2Q
+          check2 = 
+            case pointsAdded of
+              INF_POINT -> False
+              (Point resX _ ) -> 
+                ((resX `mod` p) `mod` n) == (r `mod` n)
+        in check1 && check2 
       else 
         False
   in result
-
---signatureNotFake = 

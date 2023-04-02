@@ -1,16 +1,12 @@
 --lenn :: a -> b
 --ll :: n -> [a] -> 
-heh :: Integer -> Integer
-heh x 
-    | x == 1 = 69
-    | otherwise = kek
-        where
-            | x == 2 = 42
-            | otherwise = 100
 
+
+isInRange :: Integer -> Integer -> Bool
+isInRange upBound n = (1 <= n) && (n <= upBound - 1)
 
 main :: IO ()
 main =  do 
     putStrLn "Length of list: "
-    print(heh(2))
+    print(isInRange 2 1)
 

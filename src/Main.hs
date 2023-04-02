@@ -16,6 +16,9 @@ data Curve = Curve {p:: Integer, a::Integer, b::Integer, g::Point, n::Integer, h
 
 data KeyPair = KeyPair { private:: Integer, public:: Point} deriving (Show)
 
+data Signature = Signature { r:: Integer, s:: Integer} deriving (Show)
+
+
 main :: IO()
 main = do
     args <- getArgs                  -- IO [String]
@@ -29,7 +32,8 @@ main = do
     let point1 = Point 6 1
     let point2 = Point 8 1
     let point3 = Point 13 16
-
+    let hash = 67213401616213387970971763789012420154960832235626142256921887584606087023075
+    let publicKey = Point 46708116978045949128126606656587981811337507042416885728414175564892275890406 5702285058721776178091486875671758702564598994857583307601405313313922439896
     -- print $ pointDoubleOrAdd point1 $ pointNegation(point1)
     --print $ pointDoubleOrAdd point1 point2
 
@@ -38,14 +42,22 @@ main = do
       Right curve ->
         case params of
           (Params I_OPTION _) -> print curve
-          --(Params K_OPTION _) -> print keypair
+          --(Params K_OPTION _) -> print $ extendedEuclidean 240 46
           --(Params K_OPTION _) -> print $ pointDoubleOrAdd curve point1 point2
           --(Params K_OPTION _) -> print $ pointDoubleOrAdd (Curve 37 0 7 (Point 6 1) 7 1) point1 point1
           (Params K_OPTION _) -> print $ keypair
-            where (keypair, _) = generateKeyPair curve rng1
-          (Params S_OPTION _) -> print curve
-          (Params V_OPTION _) -> print curve
-          (Params H_OPTION _) -> print curve
+            where 
+              (keypair, _) = generateKeyPair curve rng1
+          (Params S_OPTION _) -> print $ signature 
+            where 
+              (keypair, rng2) = generateKeyPair curve rng1
+              (signature, _) = createSignature curve keypair hash rng2
+          (Params V_OPTION _) -> print $ result
+            where 
+              (keypair, rng2) = generateKeyPair curve rng1
+              (signature, _) = createSignature curve keypair hash rng2
+              result = signatureVerification curve keypair signature hash
+          --(Params H_OPTION _) -> print curve
             
     -- let result = execute params
     --print curve
@@ -117,6 +129,8 @@ inputParse input = parse curveParse "" input
 pointDoubleOrAdd :: Curve -> Point -> Point -> Point
 pointDoubleOrAdd _ INF_POINT p2 = p2
 pointDoubleOrAdd _ p1 INF_POINT = p1
+pointDoubleOrAdd _ (Point 0 0) p2 = p2
+pointDoubleOrAdd _ p1 (Point 0 0) = p1
 pointDoubleOrAdd (Curve p a b _ n _) p1@(Point x1 y1) p2@(Point x2 y2)
   | (x1 == x2) && (y1 == negate y2) = INF_POINT
   | otherwise = 
@@ -130,15 +144,19 @@ calcLambda :: Integer -> Integer -> Point -> Point -> Integer
 calcLambda _ _ INF_POINT _ = 0
 calcLambda _ _ _ INF_POINT = 0
 calcLambda a p (Point x1 y1) (Point x2 y2)
+  -- case the points are the same
   | (x1 == x2) && (y1 == y2) = 
     let 
-      res1 = ((3 * ( x2*x2 )) + a) `div` (2 * y2)
+      nominator = ((3 * ( x2*x2 )) + a)
+      modInvDenom1 = (modInv (2 * y2) p)
+      res1 = nominator * modInvDenom1
     in res1 `mod` p
   | otherwise =
     let 
       yDiff = y2 - y1
       xDiff = x2 - x1
-      res2 = yDiff `div` xDiff
+      modInvDenom2 = modInv xDiff p
+      res2 = yDiff * modInvDenom2
     in res2 `mod` p
 
 pointMultiply :: Curve -> Integer -> Point -> Point
@@ -150,6 +168,21 @@ pointMultiply c n p@(Point _ _)
 -- doubling - firstly double the current point and then recursively call pointMultiply
   | otherwise = pointMultiply c  (n `div` 2) $ pointDoubleOrAdd c p p
 
+modInv :: Integer -> Integer -> Integer
+modInv a m = 
+  let (r, t, s) = extendedEuclidean a m
+  in if r /= 1
+    then error "There was an error calculating modular inverse"
+    else t `mod` m
+
+extendedEuclidean :: Integer -> Integer -> (Integer, Integer, Integer)
+extendedEuclidean a 0 = (a, 1, 0)
+extendedEuclidean a b =
+    let (r, t, s) = extendedEuclidean b c
+    in (r, s, t - (d * s))
+     where 
+      (d, c) = divMod a b
+
 randomizeInt :: RandomGen tg => Integer -> tg -> (Integer, tg)
 randomizeInt 0 rng = (0, rng)
 randomizeInt n rng = randomNum 1 n rng
@@ -160,7 +193,45 @@ randomNum from to rng = randomR(from, to) rng
 generateKeyPair :: RandomGen tg => Curve -> tg -> (KeyPair, tg)
 --generateKeyPair (Curve p a b g n h) rng = KeyPair (Point $ randomNum n $ randomNum n) (Point $ randomNum n $ randomNum n)
 generateKeyPair c@(Curve _ _ _ k n _) rng = 
-  let (secretKey, rng2) = randomizeInt n rng
+  let 
+    (secretKey, rng2) = randomizeInt n rng
   -- in (secretKey, rng2) = 
-  in (KeyPair 91305095057638279798210088207290086814184648949849354342409048655369161716366 $ pointMultiply c 91305095057638279798210088207290086814184648949849354342409048655369161716366 k, rng2)
+  -- in (KeyPair 91305095057638279798210088207290086814184648949849354342409048655369161716366 $ pointMultiply c 91305095057638279798210088207290086814184648949849354342409048655369161716366 k, rng2)
+  in (KeyPair secretKey $ pointMultiply c secretKey k, rng2)
 
+createSignature :: RandomGen tg => Curve -> KeyPair -> Integer -> tg -> (Signature, tg)
+createSignature c@(Curve _ _ _ (Point x y) n _) kp@(KeyPair priv pub) hash rng =
+  let
+    (k, rng2) = randomizeInt n rng
+    (Point xkG ykG) = pointMultiply c k (Point x y)
+    r = x `mod` n
+  in 
+    if r == 0 
+      then 
+        -- recursively try generate again 
+        createSignature c kp hash rng2 
+      else  
+        (Signature r ((hash + r * priv) * (modInv k n) `mod` n), rng2)
+
+isOnCurve :: Curve -> Point -> Bool
+isOnCurve c@(Curve p a b _ _ _) (Point x y) =
+  let
+      left = (y * y) `mod` p
+      right = ((x * x * x) + (a * x) + b) `mod` p
+  in left == right
+
+signatureVerification :: Curve -> KeyPair -> Signature -> hash -> Bool
+signatureVerification _ kp@(KeyPair priv INF_POINT) _ _ = False
+signatureVerification c@(Curve _ _ _ (Point x y) n _) kp@(KeyPair priv pub) sig@(Signature r s) hash =
+  let
+    onCurve = isOnCurve c pub
+    result = if onCurve == True 
+      then 
+        let
+          kek = True
+        in kek
+      else 
+        False
+  in result
+
+--signatureNotFake = 

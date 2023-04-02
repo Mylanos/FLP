@@ -92,16 +92,18 @@ argsParse (x:y:[])
 -- Parse a hexadecimal integer
 hexInteger :: Parser Integer
 hexInteger = do
-  digits <- try (string "0x" *> many1 hexDigit) <|> many1 digit
+  digits <- try (string "0x" >> many1 hexDigit) <|> many1 digit
   --digits <- many1 hexDigit
   return $ fst $ head $ readHex $ digits
 
 -- Parse a point
 pointParse :: Parser Point
 pointParse = do
-  _ <- string "Point" *> spaces *> char '{' *> spaces
-  xVal <- string "x:" *> spaces *> hexInteger <* spaces
-  yVal <- string "y:" *> spaces *> hexInteger <* spaces
+  _ <- string "Point" >> spaces >> char '{' >> spaces
+  xVal <- string "x:" >> spaces >> hexInteger 
+  _ <- spaces
+  yVal <- string "y:" >> spaces >> hexInteger
+  _ <- spaces
   _ <- string "}" 
   spaces
   return $ Point xVal yVal
@@ -109,13 +111,18 @@ pointParse = do
 -- Parse a curve
 curveParse :: Parser Curve
 curveParse = do
-  _ <- string "Curve" *> spaces *> char '{' *> spaces
-  pVal <- string "p:" *> spaces *> hexInteger <* spaces
-  aVal <- string "a:" *> spaces *> hexInteger <* spaces
-  bVal <- string "b:" *> spaces *> hexInteger <* spaces
-  gVal <- string "g:" *> spaces *> pointParse
-  nVal <- string "n:" *> spaces *> hexInteger <* spaces
-  hVal <- string "h:" *> spaces *> hexInteger <* spaces
+  _ <- string "Curve" >> spaces >> char '{' >> spaces
+  pVal <- string "p:" >> spaces >> hexInteger 
+  _ <- spaces
+  aVal <- string "a:" >> spaces >> hexInteger
+  _ <- spaces
+  bVal <- string "b:" >> spaces >> hexInteger
+  _ <- spaces
+  gVal <- string "g:" >> spaces >> pointParse
+  nVal <- string "n:" >> spaces >> hexInteger
+  _ <- spaces
+  hVal <- string "h:" >> spaces >> hexInteger
+  _ <- spaces
   _ <- string "}"
   return $ Curve pVal aVal bVal gVal nVal hVal
 

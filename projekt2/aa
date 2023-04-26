@@ -1,0 +1,1 @@
+sudo sshfs -o allow_other xziska03@merlin.fit.vutbr.cz:/homes/eva/xz/xziska03/Dokumenty/FLP/projekt2/ /home/mylan/Documents/FLP/projekt2/

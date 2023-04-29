@@ -1,6 +1,6 @@
   # FLP - 2. projekt
-  # 23.4.2017
-  # Autor: Bc. Lukas Pelanek, xpelan03@stud.fit.vutbr.cz
+  # 29.4.2023
+  # Bc. Marek Ziska, xziska03@stud.fit.vutbr.cz
 
 PROGRAM=flp22-log
 SRC=xziska03.pl

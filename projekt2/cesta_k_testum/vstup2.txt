@@ -1,0 +1,5 @@
+S a G a
+S a S a
+S a F b
+S a M a
+aa

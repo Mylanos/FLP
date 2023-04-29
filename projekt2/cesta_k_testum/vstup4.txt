@@ -1,0 +1,4 @@
+S a B b
+B b C R
+C a B b
+aaaaaaa

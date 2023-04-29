@@ -1,0 +1,7 @@
+S m Z c
+Z c B R
+B m C R
+C m C R
+C   A R
+A   F b
+mmm   
